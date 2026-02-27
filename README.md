@@ -41,11 +41,17 @@ TOTAL\t<count> <unit>\t<minutes> min\t<rate> <unit>/min
 ## Visualization
 The repository includes a plotting script to visualize rate distributions:
 ```bash
-uv run python scripts/visualize_rates.py --root /path/to/subtitles --out rate_distributions_lines --granularity line
+uv run scripts/visualize_rates.py --root /path/to/subtitles --out rate_distributions_lines --granularity line
 ```
 - Use `--granularity episode` for per-episode distributions.
 - Add `--trim-outliers` to apply IQR trimming before plotting.
 - Use `--unit kana` to plot kana/min instead of mora/min.
+
+## Per-show Summary (Recursive)
+Compute a per-show summary table by scanning a root directory recursively (Markdown output, sorted by rate):
+```bash
+uv run scripts/collect_show_rates.py --root /path/to/subtitles
+```
 
 ## How the mora count is computed
 **What is a mora?** A mora is a timing unit in Japanese phonology (roughly a beat). For example, small kana combine with the preceding mora: 「きゃ」 counts as 1 mora, so 「きゃく」 is 2 mora (きゃ・く), and 「しゅっぱつ」 is 4 mora (しゅ・っ・ぱ・つ).
