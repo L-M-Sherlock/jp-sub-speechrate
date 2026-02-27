@@ -99,18 +99,27 @@ def merge_intervals(intervals: Iterable[Tuple[int, int]]) -> List[Tuple[int, int
     return [(s, e) for s, e in merged]
 
 
-def merge_duplicate_items(items: Iterable[Tuple[int, int, str]]) -> List[Tuple[int, int, str]]:
-    merged = []
-    for start, end, text in sorted(items, key=lambda x: (x[0], x[1])):
-        if not merged:
-            merged.append([start, end, text])
-            continue
-        last = merged[-1]
-        if text == last[2] and start <= last[1]:
-            last[1] = max(last[1], end)
-            continue
-        merged.append([start, end, text])
-    return [(s, e, t) for s, e, t in merged]
+def merge_duplicate_items(
+    items: Iterable[Tuple[int, int, str]], max_gap_ms: int = 0
+) -> List[Tuple[int, int, str]]:
+    grouped: dict[str, list[Tuple[int, int]]] = {}
+    for start, end, text in items:
+        grouped.setdefault(text, []).append((start, end))
+
+    merged_items: list[Tuple[int, int, str]] = []
+    for text, spans in grouped.items():
+        spans.sort()
+        cur_start, cur_end = spans[0]
+        for start, end in spans[1:]:
+            if start <= cur_end + max_gap_ms:
+                cur_end = max(cur_end, end)
+            else:
+                merged_items.append((cur_start, cur_end, text))
+                cur_start, cur_end = start, end
+        merged_items.append((cur_start, cur_end, text))
+
+    merged_items.sort(key=lambda x: (x[0], x[1], x[2]))
+    return merged_items
 
 
 def parse_srt(path: str) -> List[Tuple[int, int, str]]:
@@ -119,7 +128,7 @@ def parse_srt(path: str) -> List[Tuple[int, int, str]]:
     for sub in subs:
         text = clean_text(sub.text or "")
         items.append((sub.start.ordinal, sub.end.ordinal, text))
-    return merge_duplicate_items(items)
+    return merge_duplicate_items(items, max_gap_ms=200)
 
 
 def _parse_ass_time(ts: str) -> int:
@@ -175,4 +184,4 @@ def parse_ass(path: str) -> List[Tuple[int, int, str]]:
                 text = clean_text(fields[idx_text])
                 items.append((start, end, text))
 
-    return merge_duplicate_items(items)
+    return merge_duplicate_items(items, max_gap_ms=200)
