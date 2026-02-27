@@ -53,6 +53,13 @@ Compute a per-show summary table by scanning a root directory recursively (Markd
 uv run scripts/collect_show_rates.py --root /path/to/subtitles
 ```
 
+## Episode CSV Export
+Export per-line rates for a single episode to CSV:
+```bash
+uv run scripts/episode_to_csv.py /path/to/episode.srt /path/to/output.csv
+```
+Use `--unit kana` for kana/min instead of mora/min.
+
 ## How the mora count is computed
 **What is a mora?** A mora is a timing unit in Japanese phonology (roughly a beat). For example, small kana combine with the preceding mora: 「きゃ」 counts as 1 mora, so 「きゃく」 is 2 mora (きゃ・く), and 「しゅっぱつ」 is 4 mora (しゅ・っ・ぱ・つ).
 **How this project’s mora differs from the linguistic definition:** we approximate mora counts from Sudachi readings and subtitle timing. This means we count mora from the kana reading after normalization (e.g., symbols/whitespace removed, sokuon stripped, long vowels counted), and we do not model prosody, pauses, or coarticulation. The result is a practical “subtitle mora rate,” not a phonetic ground truth.
