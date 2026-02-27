@@ -38,6 +38,15 @@ Output format:
 TOTAL\t<count> <unit>\t<minutes> min\t<rate> <unit>/min
 ```
 
+## Visualization
+The repository includes a plotting script to visualize rate distributions:
+```bash
+uv run python scripts/visualize_rates.py --root /path/to/subtitles --out rate_distributions_lines --granularity line
+```
+- Use `--granularity episode` for per-episode distributions.
+- Add `--trim-outliers` to apply IQR trimming before plotting.
+- Use `--unit kana` to plot kana/min instead of mora/min.
+
 ## How the mora count is computed
 **What is a mora?** A mora is a timing unit in Japanese phonology (roughly a beat). For example, small kana combine with the preceding mora: 「きゃ」 counts as 1 mora, so 「きゃく」 is 2 mora (きゃ・く), and 「しゅっぱつ」 is 4 mora (しゅ・っ・ぱ・つ).
 **How this project’s mora differs from the linguistic definition:** we approximate mora counts from Sudachi readings and subtitle timing. This means we count mora from the kana reading after normalization (e.g., symbols/whitespace removed, sokuon stripped, long vowels counted), and we do not model prosody, pauses, or coarticulation. The result is a practical “subtitle mora rate,” not a phonetic ground truth.
