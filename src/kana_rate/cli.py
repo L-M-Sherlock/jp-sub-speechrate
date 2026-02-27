@@ -83,9 +83,9 @@ def main():
     parser.add_argument("path", help="Subtitle file or directory")
     parser.add_argument("--kana", action="store_true", help="Compute kana-per-minute instead of mora-per-minute")
     parser.add_argument(
-        "--trim-outliers",
+        "--include-outliers",
         action="store_true",
-        help="Trim per-line rate outliers using IQR before computing totals",
+        help="Include per-line rate outliers (by default they are trimmed using IQR)",
     )
     args = parser.parse_args()
 
@@ -99,13 +99,14 @@ def main():
     total_units = 0
     total_minutes = 0.0
 
+    trim_outliers = not args.include_outliers
     for path in files:
         ext = os.path.splitext(path)[1].lower()
         if ext == ".srt":
             items = parse_srt(path)
         else:
             items = parse_ass(path)
-        units, minutes, rate = _analyze_items(items, reader, use_mora, args.trim_outliers)
+        units, minutes, rate = _analyze_items(items, reader, use_mora, trim_outliers)
         total_units += units
         total_minutes += minutes
         unit = "mora" if use_mora else "kana"
