@@ -6,7 +6,7 @@ Compute **kana-per-minute** from subtitle files using Japanese reading conversio
 - Reads `.srt` and `.ass` subtitle files.
 - Converts text to kana readings with SudachiPy.
 - Counts kana characters and divides by **merged subtitle duration** (overlaps are merged).
-- Reports per-file and total kana/minute.
+- Reports per-file and total mora/minute by default (use `--kana` for kana/minute).
 
 ## Requirements
 - Python 3.10+
@@ -24,16 +24,17 @@ uv run src/kana_rate/cli.py ./file.srt
 
 ## Usage
 ```
-kana-rate <path>
+kana-rate <path> [--kana]
 ```
 - `<path>` can be a file or a directory.
 - If `<path>` is a directory, the tool processes all `.srt` files first. If no `.srt` are found, it falls back to `.ass`.
 - If you are not installing the package, run `uv run src/kana_rate/cli.py <path>` instead.
+- By default the tool reports **mora/min**. Use `--kana` to report kana/min instead.
 
 Output format:
 ```
-<filename>\t<kana_count> kana\t<minutes> min\t<rate> kana/min
-TOTAL\t<kana_count> kana\t<minutes> min\t<rate> kana/min
+<filename>\t<count> <unit>\t<minutes> min\t<rate> <unit>/min
+TOTAL\t<count> <unit>\t<minutes> min\t<rate> <unit>/min
 ```
 
 ## How the kana count is computed

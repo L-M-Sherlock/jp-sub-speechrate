@@ -12,6 +12,7 @@
 Use `uv` (recommended) for a local environment:
 - `uv run src/kana_rate/cli.py ./subtitles` runs the CLI on a directory.
 - `uv run src/kana_rate/cli.py ./file.srt` runs the CLI on a single file.
+- Output is mora/min by default; pass `--kana` for kana/min.
 
 Packaging is handled by `setuptools` per `pyproject.toml`. If you need a build artifact, use the `build` package in your environment.
 

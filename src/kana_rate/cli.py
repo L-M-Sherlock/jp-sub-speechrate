@@ -15,22 +15,22 @@ def _analyze_items(items, reader: KanaReader, use_mora: bool):
         texts.append(text)
         intervals.append((start, end))
 
-    kana_total = 0
+    total_units = 0
     for text in texts:
         text = strip_nonspoken(text)
         if not text.strip():
             continue
         reading = reader.to_kana(text)
         if use_mora:
-            kana_total += reader.count_mora(reading)
+            total_units += reader.count_mora(reading)
         else:
-            kana_total += reader.count_kana(reading)
+            total_units += reader.count_kana(reading)
 
     merged = merge_intervals(intervals)
     total_ms = sum(e - s for s, e in merged)
     minutes = total_ms / 1000.0 / 60.0 if total_ms > 0 else 0.0
-    rate = (kana_total / minutes) if minutes > 0 else 0.0
-    return kana_total, minutes, rate
+    rate = (total_units / minutes) if minutes > 0 else 0.0
+    return total_units, minutes, rate
 
 
 def _collect_files(path: str):
@@ -45,9 +45,9 @@ def _collect_files(path: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compute kana-per-minute from subtitles.")
+    parser = argparse.ArgumentParser(description="Compute mora-per-minute from subtitles.")
     parser.add_argument("path", help="Subtitle file or directory")
-    parser.add_argument("--mora", action="store_true", help="Compute mora-per-minute instead of kana-per-minute")
+    parser.add_argument("--kana", action="store_true", help="Compute kana-per-minute instead of mora-per-minute")
     args = parser.parse_args()
 
     files = _collect_files(args.path)
@@ -56,7 +56,8 @@ def main():
         return
 
     reader = KanaReader()
-    total_kana = 0
+    use_mora = not args.kana
+    total_units = 0
     total_minutes = 0.0
 
     for path in files:
@@ -65,15 +66,15 @@ def main():
             items = parse_srt(path)
         else:
             items = parse_ass(path)
-        kana, minutes, rate = _analyze_items(items, reader, args.mora)
-        total_kana += kana
+        units, minutes, rate = _analyze_items(items, reader, use_mora)
+        total_units += units
         total_minutes += minutes
-        unit = "mora" if args.mora else "kana"
-        print(f"{os.path.basename(path)}\t{kana} {unit}\t{minutes:.2f} min\t{rate:.2f} {unit}/min")
+        unit = "mora" if use_mora else "kana"
+        print(f"{os.path.basename(path)}\t{units} {unit}\t{minutes:.2f} min\t{rate:.2f} {unit}/min")
 
-    total_rate = (total_kana / total_minutes) if total_minutes > 0 else 0.0
-    unit = "mora" if args.mora else "kana"
-    print(f"TOTAL\t{total_kana} {unit}\t{total_minutes:.2f} min\t{total_rate:.2f} {unit}/min")
+    total_rate = (total_units / total_minutes) if total_minutes > 0 else 0.0
+    unit = "mora" if use_mora else "kana"
+    print(f"TOTAL\t{total_units} {unit}\t{total_minutes:.2f} min\t{total_rate:.2f} {unit}/min")
 
 
 if __name__ == "__main__":
