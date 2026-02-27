@@ -70,26 +70,16 @@ class KanaReader:
     @staticmethod
     def count_mora(text: str) -> int:
         count = 0
-        prev_was_kana = False
         for ch in text:
             if ch in SMALL_KANA:
-                if not prev_was_kana:
-                    count += 1
-                prev_was_kana = False
                 continue
             if ch == "ー":
-                count += 1
-                prev_was_kana = True
                 continue
             if ch in ("っ", "ッ"):
-                prev_was_kana = False
                 continue
             code = ord(ch)
             if (0x3040 <= code <= 0x309F) or (0x30A0 <= code <= 0x30FF):
                 count += 1
-                prev_was_kana = True
-                continue
-            prev_was_kana = False
         return count
 
 
