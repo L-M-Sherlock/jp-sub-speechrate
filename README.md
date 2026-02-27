@@ -24,12 +24,13 @@ uv run src/kana_rate/cli.py ./file.srt
 
 ## Usage
 ```
-kana-rate <path> [--kana]
+kana-rate <path> [--kana] [--trim-outliers]
 ```
 - `<path>` can be a file or a directory.
 - If `<path>` is a directory, the tool processes all `.srt` files first. If no `.srt` are found, it falls back to `.ass`.
 - If you are not installing the package, run `uv run src/kana_rate/cli.py <path>` instead.
 - By default the tool reports **mora/min**. Use `--kana` to report kana/min instead.
+- Use `--trim-outliers` to drop per-line rate outliers (IQR) before computing totals.
 
 Output format:
 ```

@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 uv.lock
 src/kana_rate.egg-info/
+rate_distributions/
+rate_distributions_lines/

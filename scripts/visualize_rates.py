@@ -18,34 +18,37 @@ def _parse_items(path: Path):
     return []
 
 
-def _episode_rate(items, reader: KanaReader, unit: str) -> float:
-    texts = []
-    intervals = []
-    for start, end, text in items:
-        if not text.strip():
-            continue
-        text = strip_nonspoken(text)
-        if not text.strip():
-            continue
-        texts.append(text)
-        intervals.append((start, end))
-
-    total = 0
-    for text in texts:
-        reading = reader.to_kana(text)
-        if unit == "mora":
-            total += reader.count_mora(reading)
-        else:
-            total += reader.count_kana(reading)
-
-    merged = merge_intervals(intervals)
-    total_ms = sum(e - s for s, e in merged)
-    minutes = total_ms / 1000.0 / 60.0 if total_ms > 0 else 0.0
-    return (total / minutes) if minutes > 0 else 0.0
+def _percentile(sorted_vals: list[float], p: float) -> float:
+    if not sorted_vals:
+        return 0.0
+    if p <= 0:
+        return sorted_vals[0]
+    if p >= 100:
+        return sorted_vals[-1]
+    k = (len(sorted_vals) - 1) * (p / 100.0)
+    f = int(k)
+    c = min(f + 1, len(sorted_vals) - 1)
+    if f == c:
+        return sorted_vals[f]
+    return sorted_vals[f] * (c - k) + sorted_vals[c] * (k - f)
 
 
-def _line_rates(items, reader: KanaReader, unit: str) -> list[float]:
-    rates: list[float] = []
+def _trim_iqr(values: list[float]) -> list[float]:
+    if len(values) < 4:
+        return values
+    sorted_vals = sorted(values)
+    q1 = _percentile(sorted_vals, 25)
+    q3 = _percentile(sorted_vals, 75)
+    iqr = q3 - q1
+    if iqr <= 0:
+        return values
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+    return [v for v in values if lower <= v <= upper]
+
+
+def _line_entries(items, reader: KanaReader, unit: str) -> list[tuple[int, int, int, float]]:
+    entries = []
     for start, end, text in items:
         if not text.strip():
             continue
@@ -63,8 +66,36 @@ def _line_rates(items, reader: KanaReader, unit: str) -> list[float]:
         if count <= 0:
             continue
         rate = count / (duration_ms / 1000.0 / 60.0)
-        rates.append(rate)
-    return rates
+        entries.append((start, end, count, rate))
+    return entries
+
+
+def _episode_rate(items, reader: KanaReader, unit: str, trim_outliers: bool) -> float:
+    entries = _line_entries(items, reader, unit)
+    if not entries:
+        return 0.0
+
+    if trim_outliers:
+        rates = sorted(e[3] for e in entries)
+        q1 = _percentile(rates, 25)
+        q3 = _percentile(rates, 75)
+        iqr = q3 - q1
+        if iqr > 0:
+            lower = q1 - 1.5 * iqr
+            upper = q3 + 1.5 * iqr
+            entries = [e for e in entries if lower <= e[3] <= upper]
+    if not entries:
+        return 0.0
+
+    total = sum(e[2] for e in entries)
+    merged = merge_intervals([(e[0], e[1]) for e in entries])
+    total_ms = sum(e - s for s, e in merged)
+    minutes = total_ms / 1000.0 / 60.0 if total_ms > 0 else 0.0
+    return (total / minutes) if minutes > 0 else 0.0
+
+
+def _line_rates(items, reader: KanaReader, unit: str) -> list[float]:
+    return [e[3] for e in _line_entries(items, reader, unit)]
 
 
 def _collect_show_dirs(root: Path, exclude_subtitle_backup: bool) -> list[Path]:
@@ -103,6 +134,11 @@ def main():
         help="Distribution granularity: per episode or per subtitle line (default: episode)",
     )
     parser.add_argument(
+        "--trim-outliers",
+        action="store_true",
+        help="Trim outliers using IQR before computing distributions",
+    )
+    parser.add_argument(
         "--include-subtitle-backup",
         action="store_true",
         help="Include SubtitleBackup folders",
@@ -130,12 +166,14 @@ def main():
                 continue
             items = _parse_items(fname)
             if args.granularity == "episode":
-                rate = _episode_rate(items, reader, args.unit)
+                rate = _episode_rate(items, reader, args.unit, args.trim_outliers)
                 if rate > 0:
                     rates.append(rate)
             else:
                 rates.extend(_line_rates(items, reader, args.unit))
         if rates:
+            if args.granularity == "line" and args.trim_outliers:
+                rates = _trim_iqr(rates)
             show_rates[d.name] = rates
 
     if not show_rates:

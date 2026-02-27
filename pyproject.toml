@@ -8,6 +8,7 @@ dependencies = [
   "pysrt==1.1.2",
   "sudachipy==0.6.8",
   "sudachidict-core==20240109",
+  "matplotlib>=3.10.8",
 ]
 
 [project.scripts]
