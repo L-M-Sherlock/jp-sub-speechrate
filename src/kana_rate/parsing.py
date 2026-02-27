@@ -99,8 +99,15 @@ def merge_intervals(intervals: Iterable[Tuple[int, int]]) -> List[Tuple[int, int
     return [(s, e) for s, e in merged]
 
 
+def _text_length(text: str) -> int:
+    stripped = strip_nonspoken(text)
+    return len(stripped.replace("\n", ""))
+
+
 def merge_duplicate_items(
-    items: Iterable[Tuple[int, int, str]], max_gap_ms: int = 0
+    items: Iterable[Tuple[int, int, str]],
+    max_gap_ms: int = 0,
+    min_length_for_gap: int = 0,
 ) -> List[Tuple[int, int, str]]:
     grouped: dict[str, list[Tuple[int, int]]] = {}
     for start, end, text in items:
@@ -109,9 +116,14 @@ def merge_duplicate_items(
     merged_items: list[Tuple[int, int, str]] = []
     for text, spans in grouped.items():
         spans.sort()
+        if len(spans) == 1:
+            merged_items.append((spans[0][0], spans[0][1], text))
+            continue
+
+        gap_limit = max_gap_ms if _text_length(text) >= min_length_for_gap else 0
         cur_start, cur_end = spans[0]
         for start, end in spans[1:]:
-            if start <= cur_end + max_gap_ms:
+            if start <= cur_end + gap_limit:
                 cur_end = max(cur_end, end)
             else:
                 merged_items.append((cur_start, cur_end, text))
@@ -128,7 +140,7 @@ def parse_srt(path: str) -> List[Tuple[int, int, str]]:
     for sub in subs:
         text = clean_text(sub.text or "")
         items.append((sub.start.ordinal, sub.end.ordinal, text))
-    return merge_duplicate_items(items, max_gap_ms=200)
+    return merge_duplicate_items(items, max_gap_ms=3000, min_length_for_gap=8)
 
 
 def _parse_ass_time(ts: str) -> int:
@@ -184,4 +196,4 @@ def parse_ass(path: str) -> List[Tuple[int, int, str]]:
                 text = clean_text(fields[idx_text])
                 items.append((start, end, text))
 
-    return merge_duplicate_items(items, max_gap_ms=200)
+    return merge_duplicate_items(items, max_gap_ms=3000, min_length_for_gap=8)
