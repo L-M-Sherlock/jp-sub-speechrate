@@ -1,12 +1,12 @@
 # jp-sub-speechrate
 
-Compute **mora-per-minute** from subtitle files using Japanese reading conversion. This tool converts kanji to kana (via SudachiPy) before counting, so the rate reflects spoken Japanese rather than just visible kana.
+Compute **mora-per-minute** (or kana/syllable) from subtitle files using Japanese reading conversion. This tool converts kanji to kana (via SudachiPy) before counting, so the rate reflects spoken Japanese rather than just visible kana.
 
 ## What it does
 - Reads `.srt` and `.ass` subtitle files.
 - Converts text to kana readings with SudachiPy.
-- Counts kana characters and divides by **merged subtitle duration** (overlaps are merged).
-- Reports per-file and total mora/minute by default (use `--kana` for kana/minute).
+- Counts mora/kana/syllable units and divides by **merged subtitle duration** (overlaps are merged).
+- Reports per-file and total mora/minute by default (use `--kana` for kana/minute or `--unit syllable`).
 
 ## Requirements
 - Python 3.10+
@@ -24,12 +24,12 @@ uv run src/jp_sub_speechrate/cli.py ./file.srt
 
 ## Usage
 ```
-jsub-rate <path> [--kana] [--include-outliers]
+jsub-rate <path> [--kana] [--unit mora|kana|syllable] [--include-outliers]
 ```
 - `<path>` can be a file or a directory.
 - If `<path>` is a directory, the tool processes all `.srt` files first. If no `.srt` are found, it falls back to `.ass`.
 - If you are not installing the package, run `uv run src/jp_sub_speechrate/cli.py <path>` instead.
-- By default the tool reports **mora/min**. Use `--kana` to report kana/min instead.
+- By default the tool reports **mora/min**. Use `--kana` or `--unit` to change the unit.
 - By default per-line rate outliers are trimmed (IQR). Use `--include-outliers` to keep them.
 
 Output format:
@@ -45,7 +45,7 @@ uv run scripts/visualize_rates.py --root /path/to/subtitles --out rate_distribut
 ```
 - Use `--granularity episode` for per-episode distributions.
 - Add `--trim-outliers` to apply IQR trimming before plotting.
-- Use `--unit kana` to plot kana/min instead of mora/min.
+- Use `--unit kana` or `--unit syllable` to plot alternate units.
 
 ## Per-show Summary (Recursive)
 Compute a per-show summary table by scanning a root directory recursively (Markdown output, sorted by rate):
@@ -58,11 +58,12 @@ Export per-line rates for a single episode to CSV:
 ```bash
 uv run scripts/episode_to_csv.py /path/to/episode.srt /path/to/output.csv
 ```
-Use `--unit kana` for kana/min instead of mora/min.
+Use `--unit kana` or `--unit syllable` for alternate units.
 
 ## How the mora count is computed
 **What is a mora?** A mora is a timing unit in Japanese phonology (roughly a beat). For example, small kana combine with the preceding mora: 「きゃ」 counts as 1 mora, so 「きゃく」 is 2 mora (きゃ・く), and 「しゅっぱつ」 is 4 mora (しゅ・っ・ぱ・つ).
-**How this project’s mora differs from the linguistic definition:** we approximate mora counts from Sudachi readings and subtitle timing. This means we count mora from the kana reading after normalization (e.g., symbols/whitespace removed, sokuon stripped, long vowels counted), and we do not model prosody, pauses, or coarticulation. The result is a practical “subtitle mora rate,” not a phonetic ground truth.
+**How this project’s mora differs from the linguistic definition:** we approximate mora counts from Sudachi readings and subtitle timing. This means we count mora from the kana reading after normalization (e.g., symbols/whitespace removed, sokuon stripped, long vowel marks ignored), and we do not model prosody, pauses, or coarticulation. The result is a practical “subtitle mora rate,” not a phonetic ground truth.
+**How syllables are approximated:** syllables are counted by grouping vowel-bearing kana into vowel groups. This collapses long vowels and diphthongs into a single syllable, ignores sokuon (`っ/ッ`), and attaches `ん/ン` to the preceding syllable. For example, 「せんせい」 is treated as 2 syllables (せん・せい) and 「がっこう」 as 2 syllables (がっ・こう).
 1. Subtitle text is cleaned:
    - ASS override tags `{...}` and HTML tags are removed.
    - `\N` line breaks are normalized.
@@ -73,10 +74,10 @@ Use `--unit kana` for kana/min instead of mora/min.
    - Non-Japanese characters are dropped before tokenization.
 3. SudachiPy converts each line to kana readings (katakana).
    - Whitespace and symbol tokens are ignored.
-   - Sokuon (`っ`/`ッ`) is removed before counting.
+   - Sokuon (`っ`/`ッ`) is removed for mora/kana counting.
 4. Mora are counted from the kana reading.
    - Small kana are treated as part of the preceding mora.
-   - Long vowel `ー` counts as one mora.
+   - Long vowel mark `ー` is ignored.
 5. Subtitle time spans are merged to avoid double-counting overlapping lines.
 6. By default, per-line rate outliers are trimmed (IQR) before computing totals. Use `--include-outliers` to keep them.
 

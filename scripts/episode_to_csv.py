@@ -29,7 +29,7 @@ def main():
     parser.add_argument("output", help="Output CSV path")
     parser.add_argument(
         "--unit",
-        choices=["mora", "kana"],
+        choices=["mora", "kana", "syllable"],
         default="mora",
         help="Rate unit to compute (default: mora)",
     )
@@ -59,11 +59,14 @@ def main():
             duration_ms = end - start
             if duration_ms <= 0:
                 continue
-            reading = reader.to_kana(cleaned)
-            if args.unit == "mora":
-                count = reader.count_mora(reading)
-            else:
-                count = reader.count_kana(reading)
+        strip_sokuon = args.unit != "syllable"
+        reading = reader.to_kana(cleaned, strip_sokuon=strip_sokuon)
+        if args.unit == "mora":
+            count = reader.count_mora(reading)
+        elif args.unit == "syllable":
+            count = reader.count_syllable(reading)
+        else:
+            count = reader.count_kana(reading)
             if count <= 0:
                 continue
             duration_s = duration_ms / 1000.0

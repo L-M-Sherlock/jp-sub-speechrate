@@ -29,7 +29,7 @@ def _percentile(sorted_vals: list[float], p: float) -> float:
     return sorted_vals[f] * (c - k) + sorted_vals[c] * (k - f)
 
 
-def _analyze_items(items, reader: KanaReader, use_mora: bool, trim_outliers: bool):
+def _analyze_items(items, reader: KanaReader, unit: str, trim_outliers: bool):
     entries = []
     for start, end, text in items:
         if not text.strip():
@@ -40,9 +40,12 @@ def _analyze_items(items, reader: KanaReader, use_mora: bool, trim_outliers: boo
         duration_ms = end - start
         if duration_ms <= 0:
             continue
-        reading = reader.to_kana(text)
-        if use_mora:
+        strip_sokuon = unit != "syllable"
+        reading = reader.to_kana(text, strip_sokuon=strip_sokuon)
+        if unit == "mora":
             units = reader.count_mora(reading)
+        elif unit == "syllable":
+            units = reader.count_syllable(reading)
         else:
             units = reader.count_kana(reading)
         if units <= 0:
@@ -87,9 +90,14 @@ def _collect_files(path: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compute mora-per-minute from subtitles.")
+    parser = argparse.ArgumentParser(description="Compute mora/kana/syllable rates from subtitles.")
     parser.add_argument("path", help="Subtitle file or directory")
     parser.add_argument("--kana", action="store_true", help="Compute kana-per-minute instead of mora-per-minute")
+    parser.add_argument(
+        "--unit",
+        choices=["mora", "kana", "syllable"],
+        help="Rate unit to compute (overrides --kana when provided)",
+    )
     parser.add_argument(
         "--include-outliers",
         action="store_true",
@@ -103,7 +111,10 @@ def main():
         return
 
     reader = KanaReader()
-    use_mora = not args.kana
+    if args.unit:
+        unit = args.unit
+    else:
+        unit = "kana" if args.kana else "mora"
     total_units = 0
     total_minutes = 0.0
 
@@ -114,14 +125,12 @@ def main():
             items = parse_srt(path)
         else:
             items = parse_ass(path)
-        units, minutes, rate = _analyze_items(items, reader, use_mora, trim_outliers)
+        units, minutes, rate = _analyze_items(items, reader, unit, trim_outliers)
         total_units += units
         total_minutes += minutes
-        unit = "mora" if use_mora else "kana"
         print(f"{os.path.basename(path)}\t{units} {unit}\t{minutes:.2f} min\t{rate:.2f} {unit}/min")
 
     total_rate = (total_units / total_minutes) if total_minutes > 0 else 0.0
-    unit = "mora" if use_mora else "kana"
     print(f"TOTAL\t{total_units} {unit}\t{total_minutes:.2f} min\t{total_rate:.2f} {unit}/min")
 
 

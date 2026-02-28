@@ -58,9 +58,12 @@ def _line_entries(items, reader: KanaReader, unit: str) -> list[tuple[int, int, 
         duration_ms = end - start
         if duration_ms <= 0:
             continue
-        reading = reader.to_kana(text)
+        strip_sokuon = unit != "syllable"
+        reading = reader.to_kana(text, strip_sokuon=strip_sokuon)
         if unit == "mora":
             count = reader.count_mora(reading)
+        elif unit == "syllable":
+            count = reader.count_syllable(reading)
         else:
             count = reader.count_kana(reading)
         if count <= 0:
@@ -123,7 +126,7 @@ def main():
     )
     parser.add_argument(
         "--unit",
-        choices=["mora", "kana"],
+        choices=["mora", "kana", "syllable"],
         default="mora",
         help="Rate unit to compute (default: mora)",
     )

@@ -39,9 +39,12 @@ def _analyze_items(items, reader: KanaReader, unit: str, trim_outliers: bool):
         duration_ms = end - start
         if duration_ms <= 0:
             continue
-        reading = reader.to_kana(text)
+        strip_sokuon = unit != "syllable"
+        reading = reader.to_kana(text, strip_sokuon=strip_sokuon)
         if unit == "mora":
             count = reader.count_mora(reading)
+        elif unit == "syllable":
+            count = reader.count_syllable(reading)
         else:
             count = reader.count_kana(reading)
         if count <= 0:
@@ -87,7 +90,7 @@ def _collect_show_dirs(root: Path, exclude_subtitle_backup: bool) -> list[Path]:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compute per-show mora/kana rates recursively under a root directory."
+        description="Compute per-show mora/kana/syllable rates recursively under a root directory."
     )
     parser.add_argument(
         "--root",
@@ -96,7 +99,7 @@ def main():
     )
     parser.add_argument(
         "--unit",
-        choices=["mora", "kana"],
+        choices=["mora", "kana", "syllable"],
         default="mora",
         help="Rate unit to compute (default: mora)",
     )
@@ -140,7 +143,7 @@ def main():
         print("No valid subtitle entries found.")
         return
 
-    unit_label = "MORA" if args.unit == "mora" else "KANA"
+    unit_label = "MORA" if args.unit == "mora" else "SYLLABLE" if args.unit == "syllable" else "KANA"
     print(f"| DIR | {unit_label} | MIN | RATE |")
     print("| --- | --- | --- | --- |")
     for name, units, minutes, rate in sorted(rows, key=lambda r: r[3]):

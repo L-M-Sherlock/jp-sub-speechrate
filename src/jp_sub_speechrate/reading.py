@@ -14,6 +14,7 @@ NON_JP_RE = re.compile(
 KANA_TILDE_RE = re.compile(r"(?<=[\u3040-\u309F\u30A0-\u30FF])[～〜]+")
 SOKUON_RE = re.compile(r"[っッ]")
 SMALL_KANA = set("ぁぃぅぇぉゃゅょゎゕゖァィゥェォャュョヮヵヶ")
+VOWEL_ONLY = set("あいうえおアイウエオぁぃぅぇぉァィゥェォ")
 
 _FULLWIDTH_DIGITS = str.maketrans(
     {
@@ -80,6 +81,40 @@ class KanaReader:
             code = ord(ch)
             if (0x3040 <= code <= 0x309F) or (0x30A0 <= code <= 0x30FF):
                 count += 1
+        return count
+
+    @staticmethod
+    def _mora_units(text: str) -> list[str]:
+        units: list[str] = []
+        for ch in text:
+            if ch in SMALL_KANA:
+                if units:
+                    units[-1] += ch
+                else:
+                    units.append(ch)
+                continue
+            units.append(ch)
+        return units
+
+    @staticmethod
+    def count_syllable(text: str) -> int:
+        count = 0
+        last_vowel = False
+        for unit in KanaReader._mora_units(text):
+            if unit == "ー":
+                continue
+            if unit in ("っ", "ッ"):
+                last_vowel = False
+                continue
+            if unit in ("ん", "ン"):
+                continue
+            if unit in VOWEL_ONLY:
+                if not last_vowel:
+                    count += 1
+                last_vowel = True
+                continue
+            count += 1
+            last_vowel = True
         return count
 
 
