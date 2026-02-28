@@ -74,6 +74,49 @@ def _analyze_items(items, reader: KanaReader, unit: str, trim_outliers: bool):
     return total_units, minutes, rate
 
 
+def _line_rates(items, reader: KanaReader, unit: str) -> list[tuple[float, float]]:
+    entries = []
+    for start, end, text in items:
+        if not text.strip():
+            continue
+        text = strip_nonspoken(text)
+        if not text.strip():
+            continue
+        duration_ms = end - start
+        if duration_ms <= 0:
+            continue
+        strip_sokuon = unit == "kana"
+        reading = reader.to_kana(text, strip_sokuon=strip_sokuon)
+        if unit == "mora":
+            count = reader.count_mora(reading)
+        elif unit == "syllable":
+            count = reader.count_syllable(reading)
+        else:
+            count = reader.count_kana(reading)
+        if count <= 0:
+            continue
+        duration_s = duration_ms / 1000.0
+        rate = count / (duration_s / 60.0)
+        entries.append((rate, duration_s))
+    return entries
+
+
+def _weighted_median(pairs: list[tuple[float, float]]) -> float:
+    if not pairs:
+        return 0.0
+    pairs = sorted(pairs, key=lambda x: x[0])
+    total_w = sum(w for _, w in pairs)
+    if total_w <= 0:
+        return 0.0
+    target = total_w / 2.0
+    acc = 0.0
+    for v, w in pairs:
+        acc += w
+        if acc >= target:
+            return v
+    return pairs[-1][0]
+
+
 def _collect_show_dirs(root: Path, exclude_subtitle_backup: bool) -> list[Path]:
     exts = {".srt", ".ass"}
     dirs = set()
@@ -128,7 +171,7 @@ def main():
     for d in show_dirs:
         total_units = 0
         total_minutes = 0.0
-        episode_rates = []
+        line_rates = []
         for fname in sorted(d.iterdir()):
             if fname.suffix.lower() not in (".srt", ".ass"):
                 continue
@@ -136,30 +179,30 @@ def main():
             units, minutes, rate = _analyze_items(items, reader, args.unit, trim_outliers)
             total_units += units
             total_minutes += minutes
-            if minutes > 0:
-                episode_rates.append(rate)
+            line_rates.extend(_line_rates(items, reader, args.unit))
         if total_minutes > 0:
             rate = total_units / total_minutes
-            if episode_rates:
-                episode_rates.sort()
-                mid = len(episode_rates) // 2
-                if len(episode_rates) % 2 == 1:
-                    median_rate = episode_rates[mid]
-                else:
-                    median_rate = (episode_rates[mid - 1] + episode_rates[mid]) / 2.0
-            else:
-                median_rate = 0.0
-            rows.append((d.name, total_units, total_minutes, rate, median_rate))
+            if trim_outliers and len(line_rates) >= 4:
+                rates_only = sorted(r for r, _ in line_rates)
+                q1 = _percentile(rates_only, 25)
+                q3 = _percentile(rates_only, 75)
+                iqr = q3 - q1
+                if iqr > 0:
+                    lower = q1 - 1.5 * iqr
+                    upper = q3 + 1.5 * iqr
+                    line_rates = [(r, w) for r, w in line_rates if lower <= r <= upper]
+            line_median_tw = _weighted_median(line_rates)
+            rows.append((d.name, total_units, total_minutes, rate, line_median_tw))
 
     if not rows:
         print("No valid subtitle entries found.")
         return
 
     unit_label = "MORA" if args.unit == "mora" else "SYLLABLE" if args.unit == "syllable" else "KANA"
-    print(f"| DIR | {unit_label} | MIN | RATE | MEDIAN_RATE |")
+    print(f"| DIR | {unit_label} | MIN | RATE | LINE_MEDIAN_TW |")
     print("| --- | --- | --- | --- | --- |")
-    for name, units, minutes, rate, median_rate in sorted(rows, key=lambda r: r[3]):
-        print(f"| {name} | {units} | {minutes:.2f} | {rate:.2f} | {median_rate:.2f} |")
+    for name, units, minutes, rate, line_median_tw in sorted(rows, key=lambda r: r[3]):
+        print(f"| {name} | {units} | {minutes:.2f} | {rate:.2f} | {line_median_tw:.2f} |")
 
 
 if __name__ == "__main__":
