@@ -47,6 +47,66 @@ def _trim_iqr(values: list[float]) -> set[float]:
     return {v for v in values if lower <= v <= upper}
 
 
+def _weighted_mean(values: list[float], weights: list[float] | None) -> float:
+    if not values:
+        return 0.0
+    if not weights:
+        return sum(values) / len(values)
+    total_w = sum(weights)
+    if total_w <= 0:
+        return 0.0
+    return sum(v * w for v, w in zip(values, weights)) / total_w
+
+
+def _weighted_median(values: list[float], weights: list[float] | None) -> float:
+    if not values:
+        return 0.0
+    if not weights:
+        values = sorted(values)
+        mid = len(values) // 2
+        if len(values) % 2 == 1:
+            return values[mid]
+        return (values[mid - 1] + values[mid]) / 2.0
+    pairs = sorted(zip(values, weights), key=lambda x: x[0])
+    total_w = sum(w for _, w in pairs)
+    if total_w <= 0:
+        return 0.0
+    target = total_w / 2.0
+    acc = 0.0
+    for v, w in pairs:
+        acc += w
+        if acc >= target:
+            return v
+    return pairs[-1][0]
+
+
+def _histogram_mode(values: list[float], weights: list[float] | None, bins: int) -> float:
+    if not values:
+        return 0.0
+    vmin = min(values)
+    vmax = max(values)
+    if vmin == vmax:
+        return vmin
+    width = (vmax - vmin) / bins
+    if width <= 0:
+        return vmin
+    counts = [0.0] * bins
+    if weights:
+        for v, w in zip(values, weights):
+            idx = int((v - vmin) / width)
+            if idx >= bins:
+                idx = bins - 1
+            counts[idx] += w
+    else:
+        for v in values:
+            idx = int((v - vmin) / width)
+            if idx >= bins:
+                idx = bins - 1
+            counts[idx] += 1.0
+    max_idx = max(range(bins), key=lambda i: counts[i])
+    return vmin + (max_idx + 0.5) * width
+
+
 def _line_entries(items, reader: KanaReader, unit: str) -> list[tuple[int, int, int, float, float]]:
     entries = []
     for start, end, text in items:
@@ -206,12 +266,21 @@ def main():
 
     for show, rates in show_rates.items():
         fig, ax = plt.subplots(1, 1, figsize=(8, 4), constrained_layout=True)
+        bins = 20
         if args.granularity == "line":
             values = [r for r, _ in rates]
             weights = [w for _, w in rates] if args.weight_by_duration else None
-            ax.hist(values, bins=20, weights=weights)
+            ax.hist(values, bins=bins, weights=weights)
         else:
-            ax.hist(rates, bins=20)
+            values = list(rates)
+            weights = None
+            ax.hist(rates, bins=bins)
+        mean = _weighted_mean(values, weights)
+        median = _weighted_median(values, weights)
+        mode = _histogram_mode(values, weights, bins=bins)
+        ax.axvline(mean, color="red", linestyle="--", linewidth=1.5, label=f"mean={mean:.2f}")
+        ax.axvline(median, color="tab:orange", linestyle="--", linewidth=1.5, label=f"median={median:.2f}")
+        ax.axvline(mode, color="tab:green", linestyle="--", linewidth=1.5, label=f"mode≈{mode:.2f}")
         if args.granularity == "episode":
             subtitle = f"{len(rates)} eps"
         else:
@@ -227,6 +296,7 @@ def main():
             ax.set_ylabel("Weighted seconds")
         else:
             ax.set_ylabel("Line count")
+        ax.legend(fontsize=8)
         suffix = ""
         if args.granularity == "line" and args.weight_by_duration:
             suffix = "_timeweighted"
